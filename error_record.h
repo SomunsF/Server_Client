@@ -16,7 +16,6 @@
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
-
 #define handle_error(cmd, result) \
     if (result < 0)               \
     {                             \
