@@ -14,7 +14,7 @@
 # fuwuduan: fuwuduan.c
 # 	-$(CC) -o $@ $^
 
-# 编译器和标志
+# 编译器和标志123
 CC = gcc
 CFLAGS = -lpthread -lssl -lcrypto
 
