@@ -39,3 +39,4 @@ run_client:
 
 # 清理
 clean:
+	rm client server

@@ -159,7 +159,7 @@ void *read_from_client(void *argv)
     {
         perror("send");
     }
-
+    
     printf("释放client_fd: %d资源\n", client_fd);
     shutdown(client_fd, SHUT_WR);
     close(client_fd);
