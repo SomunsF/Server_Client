@@ -203,61 +203,122 @@ void *read_from_client(void *argv)
 //     }
     
 // }
-void *write_to_client(void *arg) {
-    int client_fd = *(int *)arg;
-    char buf[1024];
+// void *write_to_client(void *arg) {
+//     int client_fd = *(int *)arg;
+//     char buf[1024];
 
+//     while (1) {
+//         // 加锁获取用户输入，防止多个线程同时从标准输入读取数据
+//         pthread_mutex_lock(&mutex);
+//         printf("请输入目标客户端号: ");
+//         if (fgets(buf, sizeof(buf), stdin) == NULL) {
+//             printf("读取客户号失败，请重试。\n");
+//             pthread_mutex_unlock(&mutex);
+//             continue;
+//         }
+//         // 去除换行符
+//         buf[strcspn(buf, "\n")] = '\0';
+//         int input_client = atoi(buf);
+
+//         // 判断输入的客户号是否与当前线程的客户端号相同
+//         if (input_client == client_fd) {
+//             char send_buf[1024];
+//             printf("准备向 client_fd %d 发消息，请输入要发送的内容:\n", client_fd);
+            
+//             while (1) {
+//                 // 读取要发送的消息
+//                 if (fgets(send_buf, sizeof(send_buf), stdin) == NULL) {
+//                     printf("读取消息失败，请重试。\n");
+//                     continue;
+//                 }
+//                 // 去除消息末尾的换行符
+//                 send_buf[strcspn(send_buf, "\n")] = '\0';
+
+//                 // 发送消息给客户端
+//                 if (send(client_fd, send_buf, strlen(send_buf), 0) == -1) {
+//                     perror("send error");
+//                 } else {
+//                     printf("发送成功。\n");
+//                 }
+                
+//                 // 询问是否退出当前发送模式
+//                 printf("如需对其它客户端发送消息请输入 -1，否则继续输入消息：");
+//                 if (fgets(buf, sizeof(buf), stdin) == NULL) {
+//                     printf("读取选择失败，请重试。\n");
+//                     continue;
+//                 }
+//                 buf[strcspn(buf, "\n")] = '\0';
+//                 if (atoi(buf) == -1) {
+//                     break;  // 跳出当前内层循环
+//                 }
+//             }
+//         }
+//         // 解锁后继续外层循环，等待下一个输入
+//         pthread_mutex_unlock(&mutex);
+//     }
+//     return NULL;
+// }
+// 全局变量
+
+
+// 单独的输入处理线程
+void *handle_user_input(void *arg) {
+    char buf[1024];
+    char send_buf[1024];
+    
     while (1) {
-        // 加锁获取用户输入，防止多个线程同时从标准输入读取数据
-        pthread_mutex_lock(&mutex);
         printf("请输入目标客户端号: ");
         if (fgets(buf, sizeof(buf), stdin) == NULL) {
             printf("读取客户号失败，请重试。\n");
-            pthread_mutex_unlock(&mutex);
             continue;
         }
-        // 去除换行符
         buf[strcspn(buf, "\n")] = '\0';
-        int input_client = atoi(buf);
-
-        // 判断输入的客户号是否与当前线程的客户端号相同
-        if (input_client == client_fd) {
-            char send_buf[1024];
-            printf("准备向 client_fd %d 发消息，请输入要发送的内容:\n", client_fd);
-            
-            while (1) {
-                // 读取要发送的消息
-                if (fgets(send_buf, sizeof(send_buf), stdin) == NULL) {
-                    printf("读取消息失败，请重试。\n");
-                    continue;
-                }
-                // 去除消息末尾的换行符
-                send_buf[strcspn(send_buf, "\n")] = '\0';
-
-                // 发送消息给客户端
-                if (send(client_fd, send_buf, strlen(send_buf), 0) == -1) {
-                    perror("send error");
-                } else {
-                    printf("发送成功。\n");
-                }
-                
-                // 询问是否退出当前发送模式
-                printf("如需对其它客户端发送消息请输入 -1，否则继续输入消息：");
-                if (fgets(buf, sizeof(buf), stdin) == NULL) {
-                    printf("读取选择失败，请重试。\n");
-                    continue;
-                }
-                buf[strcspn(buf, "\n")] = '\0';
-                if (atoi(buf) == -1) {
-                    break;  // 跳出当前内层循环
-                }
+        int target_client = atoi(buf);
+        
+        // 查找目标客户端
+        pthread_mutex_lock(&input_mutex);
+        bool found = false;
+        for (int i = 0; i < client_count; i++) {
+            if (client_fds[i] == target_client) {
+                found = true;
+                break;
             }
         }
-        // 解锁后继续外层循环，等待下一个输入
-        pthread_mutex_unlock(&mutex);
+        pthread_mutex_unlock(&input_mutex);
+        
+        if (!found) {
+            printf("客户端 %d 不存在或已断开连接\n", target_client);
+            continue;
+        }
+        
+        printf("准备向 client_fd %d 发消息，请输入要发送的内容:\n", target_client);
+        while (1) {
+            if (fgets(send_buf, sizeof(send_buf), stdin) == NULL) {
+                printf("读取消息失败，请重试。\n");
+                continue;
+            }
+            send_buf[strcspn(send_buf, "\n")] = '\0';
+            
+            if (send(target_client, send_buf, strlen(send_buf), 0) == -1) {
+                perror("send error");
+            } else {
+                printf("发送成功。\n");
+            }
+            
+            printf("如需对其它客户端发送消息请输入 -1，否则继续输入消息：");
+            if (fgets(buf, sizeof(buf), stdin) == NULL) {
+                printf("读取选择失败，请重试。\n");
+                continue;
+            }
+            buf[strcspn(buf, "\n")] = '\0';
+            if (atoi(buf) == -1) {
+                break;
+            }
+        }
     }
     return NULL;
 }
+
 
 
 int main(int argc, char const *argv[])
@@ -310,21 +371,23 @@ int main(int argc, char const *argv[])
         }else{
             log_message(INFO, "认证成功");
         };
-
+        
+        client_fds[client_count++]=client_fd;
         printf("与客户端 from %s at PORT %d 文件描述符 %d 建立连接\n",
                inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port), client_fd);
 
         pthread_t pid_read;
         pthread_t pid_write;
-
+        // 在主程序中启动一个输入处理线程
+        
         // 启动一个子线程，用来读取客户端数据，并打印到 stdout
-        // 要注意，此处的pid_read_write并不是线程ID，而是用于线程处理函数的标识符
+        
         if (pthread_create(&pid_read, NULL, read_from_client, (void *)&client_fd))
         {
             perror("pthread_read_create");
         }
         
-        if (pthread_create(&pid_write, NULL, write_to_client, (void *)&client_fd))
+        if (pthread_create(&pid_write, NULL, handle_user_input, NULL))
         {
             perror("pthread_write_create");
         }

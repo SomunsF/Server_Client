@@ -180,3 +180,8 @@ int decrypt_message(const unsigned char *ciphertext, int ciphertext_len,
     unsigned char key[32] = "01234567890123456789012345678901";  // 32字节密钥
     unsigned char iv[16] = "0123456789012345";                    // 16字节初始化向量
 
+pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
+// 假设使用一个数组存储所有客户端连接
+int client_fds[1024];
+int client_count = 0;
+
